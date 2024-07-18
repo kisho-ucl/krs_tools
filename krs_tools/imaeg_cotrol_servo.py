@@ -25,6 +25,15 @@ class Servo(Node):
     def __init__(self):
         super().__init__('control_servo')
         self.krs = serial.Serial('/dev/ttyUSB0', baudrate=115200, parity=serial.PARITY_EVEN, timeout=0.5)
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+        # Subscribe to the TF topic
+        self.tf_subscription = self.create_subscription(
+            tf2_msgs.msg.TFMessage,
+            '/tf',
+            self.tf_callback,
+            10)
+
         self.rot_speed = 30
         self.rot_once = 45.0
         self.r = 0.39
@@ -76,7 +85,6 @@ class Servo(Node):
         #print(self.pos)
         self.deg = pos2deg(self.pos)
         #print(self.stateMove)
-        """
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'map'        
@@ -84,15 +92,18 @@ class Servo(Node):
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
         t.transform.translation.z = 0.0
-        r = R.from_euler('z', -self.deg, degrees=True)
+        r = R.from_euler('z', self.deg, degrees=True)
         q = r.as_quat()
         t.transform.rotation.x = q[0]
         t.transform.rotation.y = q[1]
         t.transform.rotation.z = q[2]
         t.transform.rotation.w = q[3]
         self.tf_broadcaster.sendTransform(t)
-        """
 
+
+        
+
+        """
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'map'        
@@ -111,6 +122,7 @@ class Servo(Node):
         t.transform.rotation.z = q[2]
         t.transform.rotation.w = q[3]
         self.tf_broadcaster.sendTransform(t)
+        """
 
         #msg = Bool()
         #msg.data = self.stateMove

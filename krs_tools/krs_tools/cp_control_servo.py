@@ -26,15 +26,14 @@ class Servo(Node):
         super().__init__('control_servo')
         self.krs = serial.Serial('/dev/ttyUSB0', baudrate=115200, parity=serial.PARITY_EVEN, timeout=0.5)
         self.rot_speed = 30
-        self.rot_once = 45.0
-        self.r = 0.39
+        self.rot_once = 90.0
+        self.r = 0.40
         self.h = 0.15
         self.cntStop = 0
         self.stateMove = False
         reData = self.krs_setValue(0, SPEED, 30)
         print(reData)
         self.publisher = self.create_publisher(Bool, '/servo_state_move', 10)
-        #self.pub3 = self.create_pub3(Bool, '/create_mesh', 10)
         self.sub = self.create_subscription(String, '/cmd_rot', self.cmd_rot_callback, 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
         self.create_timer(0.1, self.publish_data)
@@ -65,16 +64,16 @@ class Servo(Node):
                self.cntStop += 1
                #print(self.cntStop)
         
+        self.deg = pos2deg(self.pos)
+
         if self.cntStop > 20:
             self.stateMove = False
             self.cntStop = 0
-            msg = Bool()
-            msg.data = False
-            self.publisher.publish(msg)
+            print(self.deg)
 
 
         #print(self.pos)
-        self.deg = pos2deg(self.pos)
+        #self.deg = pos2deg(self.pos)
         #print(self.stateMove)
         """
         t = TransformStamped()
@@ -104,7 +103,8 @@ class Servo(Node):
         t.transform.translation.x = self.r * np.sin(-th)
         t.transform.translation.y = self.r * np.cos(-th)
         t.transform.translation.z = self.h
-        r = R.from_euler('xyz', [0.0, 0.0, th-np.pi/2])
+        #r = R.from_euler('xyz', [np.pi/2, np.pi, th])
+        r = R.from_euler('xyz', [0.0, 0.0, -np.pi/2 + th])
         q = r.as_quat()
         t.transform.rotation.x = q[0]
         t.transform.rotation.y = q[1]
@@ -112,9 +112,9 @@ class Servo(Node):
         t.transform.rotation.w = q[3]
         self.tf_broadcaster.sendTransform(t)
 
-        #msg = Bool()
-        #msg.data = self.stateMove
-        #self.publisher.publish(msg)
+        msg = Bool()
+        msg.data = self.stateMove
+        self.publisher.publish(msg)
         #self.get_logger().info(f'Published: {msg.data}')
  
 
@@ -200,6 +200,7 @@ class Servo(Node):
         self.stateMove = True
         target = deg2pos(self.deg + self.rot_once)
         bl, reData = self.krs_setPos_CMD(0, target)
+
     def turnLeft(self):  # Added self parameter
         self.stateMove = True
         target = deg2pos(self.deg - self.rot_once)
