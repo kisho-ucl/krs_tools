@@ -57,7 +57,6 @@ class KeyboardCmdRot(Node):
         #self.create_timer(0.1, self.publish_op)
         #self.get_logger().info('Node has been started.')
 
-    """
     def publish_op(self):
         try:
             key = input('r: turn right, l: turn left, i: set init , o: create mesh , p: stop > ')
@@ -77,7 +76,6 @@ class KeyboardCmdRot(Node):
                 self.pub3.publish(msg3)
             elif 'p' in key:
                 msg3.data = False
-                self.pub3.publish(msg3)
             elif 'q' in key:
                 msg4.data = True
                 self.pub4.publish(msg4)
@@ -91,7 +89,7 @@ class KeyboardCmdRot(Node):
             
         except KeyboardInterrupt:
             self.shutdown()
-    """
+
 
 
         # 受信したメッセージを処理するコールバック関数
@@ -106,7 +104,7 @@ class KeyboardCmdRot(Node):
         self.bm_statePush = bool(nmsg_dict['pad']['bB'])
         #self.publish_op()
 
-
+'''
     def publish_op(self):
         msg_rot = String()
         msg_create_mesh = Bool()
@@ -120,43 +118,30 @@ class KeyboardCmdRot(Node):
         if self.over_threshold == True and self.current_bm_value <= 0.5:
             self.flag_start = not self.flag_start
             self.over_threshold = False
-            msg_create_mesh.data = self.flag_start
-            self.pub3.publish(msg_create_mesh)
             print(f"Flag_start:{self.flag_start}")
-
 
         self.last_bm_value = self.current_bm_value
 
         
         msg_save_mesh.data = self.flag_save
         self.last_b0_value = self.current_b0_value
-
-        if self.bA_statePush == True:
-                msg_rot.data = 'right'
-        elif self.bm_statePush == True:
-                msg_rot.data = 'left'
         
 
         if self.flag_start == True:
-
-            """
             if self.bA_statePush == True:
                 msg_rot.data = 'right'
             elif self.bm_statePush == True:
                 msg_rot.data = 'left'
-            """
-
+            
             #create_mesh
-            """
             if self.b0_value > 0.7:
                 self.create_cnt += 1
             else:
                 self.create_cnt = 0
-            
-            if self.create_cnt == 10:
+        
+            if self.create_cnt == 15:
                 msg_create_mesh.data = True
                 self.pub3.publish(msg_create_mesh)
-            """
 
             #else:
             #    msg_create_mesh.data = False
@@ -187,7 +172,7 @@ class KeyboardCmdRot(Node):
 
         self.pub.publish(msg_rot)
         #self.pub3.publish(msg_create_mesh)
-
+'''
     
 
 """

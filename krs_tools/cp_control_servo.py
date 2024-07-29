@@ -7,8 +7,6 @@ import numpy as np
 import tf2_ros
 import serial
 import time
-import paho.mqtt.client as mqtt
-import json
 
 STRETCH = 0x01
 SPEED = 0x02
@@ -28,7 +26,7 @@ class Servo(Node):
         super().__init__('control_servo')
         self.krs = serial.Serial('/dev/ttyUSB0', baudrate=115200, parity=serial.PARITY_EVEN, timeout=0.5)
         self.rot_speed = 30
-        self.rot_once = 45.0 #45.0
+        self.rot_once = 45.0
         self.x = 0.0
         self.y = 0.0
         self.z = 0.0
@@ -42,15 +40,10 @@ class Servo(Node):
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-        self.create_timer(0.05, self.publish_data)
+        self.create_timer(0.1, self.publish_data)
         self.deg = 0.0
-        self.last_deg = 0.0
         self.pos = 7500
         self.flag_find_loc = True
-
-        self.client = mqtt.Client()
-        self.client.connect("192.168.207.22", 1883)
-        self.timer = self.create_timer(0.1, self.publish_turntable_angle)
 
     def cmd_rot_callback(self,msg):
         data = msg.data
@@ -127,18 +120,6 @@ class Servo(Node):
         #msg.data = self.stateMove
         #self.publisher.publish(msg)
         #self.get_logger().info(f'Published: {msg.data}')
-    
-    def publish_turntable_angle(self):
-        topic="webxr/turntable_angle"
-        mesh_data = {
-            "x": 0.0,
-            "y": 0.0,
-            "z": self.deg ,
-        }
-        json_message = json.dumps(mesh_data)
-        self.client.publish(topic, json_message, qos=0)  # qos: Quality of Service (QoS) level
-        self.get_logger().info(f"Sent turntable angle via MQTT on topic '{topic}'")
-        self.last_deg = self.deg
  
 
     def krs_setPos_CMD(self, servo_id, pos):

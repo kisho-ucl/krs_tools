@@ -7,8 +7,6 @@ import numpy as np
 import tf2_ros
 import serial
 import time
-import paho.mqtt.client as mqtt
-import json
 
 STRETCH = 0x01
 SPEED = 0x02
@@ -28,61 +26,29 @@ class Servo(Node):
         super().__init__('control_servo')
         self.krs = serial.Serial('/dev/ttyUSB0', baudrate=115200, parity=serial.PARITY_EVEN, timeout=0.5)
         self.rot_speed = 30
-        self.rot_once = 45.0 #45.0
-        self.x = 0.0
-        self.y = 0.0
-        self.z = 0.0
+        self.rot_once = 90.0
+        self.r = 0.39
+        self.h = 0.15
         self.cntStop = 0
         self.stateMove = False
         reData = self.krs_setValue(0, SPEED, 30)
         print(reData)
         self.publisher = self.create_publisher(Bool, '/servo_state_move', 10)
-        #self.pub3 = self.create_pub3(Bool, '/create_mesh', 10)
         self.sub = self.create_subscription(String, '/cmd_rot', self.cmd_rot_callback, 10)
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
-        self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-        self.create_timer(0.05, self.publish_data)
+        self.create_timer(0.1, self.publish_data)
         self.deg = 0.0
-        self.last_deg = 0.0
         self.pos = 7500
-        self.flag_find_loc = True
-
-        self.client = mqtt.Client()
-        self.client.connect("192.168.207.22", 1883)
-        self.timer = self.create_timer(0.1, self.publish_turntable_angle)
 
     def cmd_rot_callback(self,msg):
         data = msg.data
-        #self.get_logger().info(f'{data}')
+        self.get_logger().info(f'{data}')
         if data == 'right':
             self.turnRight()
         elif data == 'left':
             self.turnLeft()
         elif data == 'init':
             self.setInit()
-
-    def find_table_location(self):
-        with open('/home/realsense/test_ws/src/calibration_tool/calibration_tool/info/table_location.txt', 'r') as file:
-            # 1行目を読み込む
-            line = file.readline().strip()
-            # カンマで分割し、浮動小数点数に変換
-            self.x, self.y, self.z = map(float, line.split(','))
-        """
-        try:
-            trans = self.tf_buffer.lookup_transform('map', 'marker', rclpy.time.Time())
-            tx,ty,tz = trans.transform.translation.x,trans.transform.translation.y,trans.transform.translation.z
-            self.x = tx   
-            self.y = ty   
-            self.z = tz
-            self.flag_find_loc = False
-            with open('/home/realsense/test_ws/src/calibration_tool/calibration_tool/info/table_location.txt', 'w') as f:
-                f.write(f"{tx},{ty},{tz}\n")
-            self.get_logger().info(f'found table location.')
-
-        except:
-            self.get_logger().info('marker was not found')
-        """
         
     def publish_data(self):
         try:
@@ -92,30 +58,51 @@ class Servo(Node):
         except:
             pass
 
-        if (self.stateMove == True) and (self.pos==pos):
-            self.cntStop += 1
+        if self.stateMove == True:
+           self.pos = pos
+           if self.pos == pos: 
+               self.cntStop += 1
+               #print(self.cntStop)
         
         if self.cntStop > 20:
             self.stateMove = False
             self.cntStop = 0
-            msg = Bool()
-            msg.data = False
-            self.publisher.publish(msg)
+            print(pos2deg(self.pos))
 
-        self.pos = pos
+
+        #print(self.pos)
         self.deg = pos2deg(self.pos)
-
-        if self.flag_find_loc == True: self.find_table_location()
- 
+        #print(self.stateMove)
+        """
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'map'        
-        t.child_frame_id = 'turn_table'
-        th = -self.deg*3.14/180
-        t.transform.translation.x = self.x
-        t.transform.translation.y = self.y
-        t.transform.translation.z = self.z
-        r = R.from_euler('xyz', [0.0, 0.0, th])
+        t.child_frame_id = 'servo'
+        t.transform.translation.x = 0.0
+        t.transform.translation.y = 0.0
+        t.transform.translation.z = 0.0
+        r = R.from_euler('z', -self.deg, degrees=True)
+        q = r.as_quat()
+        t.transform.rotation.x = q[0]
+        t.transform.rotation.y = q[1]
+        t.transform.rotation.z = q[2]
+        t.transform.rotation.w = q[3]
+        self.tf_broadcaster.sendTransform(t)
+        """
+
+        # 時計回りが正の方向
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = 'map'        
+        t.child_frame_id = "camera_link" #'camera_depth_optical_frame'
+        #t.transform.translation.x = 0.0
+        #t.transform.translation.y = self.r
+        #t.transform.translation.z = self.h
+        th = self.deg*np.pi/180
+        t.transform.translation.x = self.r * np.sin(-th)
+        t.transform.translation.y = self.r * np.cos(-th)
+        t.transform.translation.z = self.h  #fixed
+        r = R.from_euler('xyz', [0, 0, th-np.pi/2]) #[np.pi/2, np.pi, th]
         q = r.as_quat()
         t.transform.rotation.x = q[0]
         t.transform.rotation.y = q[1]
@@ -123,22 +110,10 @@ class Servo(Node):
         t.transform.rotation.w = q[3]
         self.tf_broadcaster.sendTransform(t)
 
-        #msg = Bool()
-        #msg.data = self.stateMove
-        #self.publisher.publish(msg)
+        msg = Bool()
+        msg.data = self.stateMove
+        self.publisher.publish(msg)
         #self.get_logger().info(f'Published: {msg.data}')
-    
-    def publish_turntable_angle(self):
-        topic="webxr/turntable_angle"
-        mesh_data = {
-            "x": 0.0,
-            "y": 0.0,
-            "z": self.deg ,
-        }
-        json_message = json.dumps(mesh_data)
-        self.client.publish(topic, json_message, qos=0)  # qos: Quality of Service (QoS) level
-        self.get_logger().info(f"Sent turntable angle via MQTT on topic '{topic}'")
-        self.last_deg = self.deg
  
 
     def krs_setPos_CMD(self, servo_id, pos):
@@ -218,17 +193,41 @@ class Servo(Node):
         self.stateMove = True
         target = deg2pos(0)
         bl, reData = self.krs_setPos_CMD(0, target)
+        #time.sleep(1.0)
+        #bl, reData = self.krs_getPos36_CMD(0)
+        #self.deg = pos2deg(reData)
+        #print("pos:", self.deg, "deg")
 
     def turnRight(self):  # Added self parameter
+        #bl, reData = self.krs_getPos36_CMD(0)
+        #current_pos_deg = pos2deg(reData)
         self.stateMove = True
         target = deg2pos(self.deg + self.rot_once)
-        if target > 11500: target=11500
         bl, reData = self.krs_setPos_CMD(0, target)
+        #for i in range(15):
+        #    time.sleep(0.1)
+        #    bl, reData = self.krs_getPos36_CMD(0)
+        #    self.deg = pos2deg(reData)
+        #self.deg += 45 
+        #time.sleep(1.0)
+        #bl, reData = self.krs_getPos36_CMD(0)
+        #self.deg = pos2deg(reData)
+        #print("pos:", self.deg, "deg")
+
     def turnLeft(self):  # Added self parameter
+        #bl, reData = self.krs_getPos36_CMD(0)
+        #current_pos_deg = pos2deg(reData)
         self.stateMove = True
         target = deg2pos(self.deg - self.rot_once)
-        if target < 3500: target = 3500
         bl, reData = self.krs_setPos_CMD(0, target)
+        #for i in range(15):
+        #    time.sleep(0.1)
+        #    bl, reData = self.krs_getPos36_CMD(0)
+        #    self.deg = pos2deg(reData)
+        #time.sleep(1.0)
+        #bl, reData = self.krs_getPos36_CMD(0)
+        #self.deg = pos2deg(reData)
+        #print("pos:", self.deg, "deg")
 
     def reviDeg(self):
         time.sleep(1.0)
@@ -252,3 +251,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
